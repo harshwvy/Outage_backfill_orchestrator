@@ -1,95 +1,144 @@
-Problem statement
+<div align="center">
 
-ETL Pipeline Outage Detection & Automated Backfill Orchestrator
-A data engineering solution to detect, diagnose, and automatically recover data gaps caused by server outages across the Oracle → MySQL → Tableau pipeline.
+# 🔧 ETL Outage Backfill Orchestrator
 
-data sources
+**Detects data gaps caused by Oracle / MySQL / Tableau outages and automatically backfills the missing window — end to end.**
 
-Oracle MES
+![Python](https://img.shields.io/badge/Python-3.8+-blue?style=flat-square&logo=python&logoColor=white)
+![Airflow](https://img.shields.io/badge/Apache%20Airflow-2.x-017CEE?style=flat-square&logo=apacheairflow&logoColor=white)
+![Oracle](https://img.shields.io/badge/Oracle-MES-F80000?style=flat-square&logo=oracle&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-Target-4479A1?style=flat-square&logo=mysql&logoColor=white)
+![Tableau](https://img.shields.io/badge/Tableau-Dashboard-E97627?style=flat-square&logo=tableau&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-target store
+</div>
 
-MySQL DB
+---
 
-visualization
+## ⚡ The Problem
 
-Tableau
+Airflow DAGs call Python scripts that read **Oracle MES tables** via `bin/*.sql` files and write transformed data to **MySQL** — which then feeds **Tableau dashboards** for business reporting.
 
-orchestration
+> When Oracle, MySQL, or Tableau experiences a server outage, data silently vanishes for that window.  
+> **No detection. No recovery. No one notices until a stakeholder asks why numbers look wrong.**
 
-Apache Airflow
+---
 
-The core problem
+## 🔄 Pipeline Flow
 
-The ETL pipeline runs Python scripts via Airflow DAGs on a scheduled basis. Each script reads from Oracle MES tables using SQL files stored in a bin/ directory, then writes transformed data to MySQL — which feeds Tableau dashboards.
+```
+Oracle MES  ──►  Airflow DAGs  ──►  MySQL  ──►  Tableau
+(Source)        (Python + SQL)     (Target)    (Dashboards)
+```
 
-When Oracle, MySQL, or Tableau experiences a server outage, no data loads for that window. The result: silent data gaps in dashboards with no automated recovery. Engineers must manually identify the affected pipelines and re-run scripts — a slow, error-prone process.
+---
 
-What the solution does
+## 🛠️ How It Works
 
-1
-Auto-discovery
+| Step | Phase | What happens |
+|------|-------|-------------|
+| **1** | 🔍 Discovery | Walks DAG, script, and SQL directories to build a full dependency map: DAG → script → SQL → Oracle tables → MySQL tables → Tableau dashboards |
+| **2** | 📊 Gap check | Queries Oracle and MySQL for zero-row windows within the outage period to confirm missing data |
+| **3** | 🔁 Backfill | Re-triggers only the affected DAGs in parallel, with configurable retries and the exact window passed as parameters |
+| **4** | 🖥️ Tableau refresh | Triggers a server-side data source refresh via Tableau REST API so dashboards self-heal |
 
-Walks the DAG, script, and SQL directories to build a full dependency map — linking every Airflow DAG to its Python scripts, SQL files, Oracle source tables, MySQL target tables, and downstream Tableau dashboards.
+---
 
-2
-Gap detection
+## 📁 Directory Structure
 
-For a given outage window, queries each Oracle and MySQL table for row counts. Zero rows in the window = confirmed data gap. Reports the exact tables, time range, and likely root cause.
-
-3
-Targeted backfill
-
-Only the affected DAGs are re-triggered — via direct subprocess, Airflow CLI, or Airflow REST API — with the exact outage start/end passed as parameters. Runs in parallel with configurable retries.
-
-4
-Tableau refresh
-
-After successful backfills, triggers a server-side data source refresh on all affected Tableau dashboards via the Tableau REST API — ensuring end users see recovered data without manual intervention.
-
-Directory structure expected
-
+```
 dag_and_scripts/
 ├── dags/               ← Airflow DAG definitions (.py)
 └── scripts/
     ├── *.py            ← ETL Python scripts
     └── bin/
         └── *.sql       ← SQL files called by scripts
-Usage
+```
 
-Map the full pipeline
+---
 
+## 🚀 Usage
+
+```bash
+# 1. Map the full pipeline (no credentials needed)
 python outage_backfill_orchestrator.py discover
-Check data gaps for an outage window
 
-python outage_backfill_orchestrator.py check --start "2024-06-01 02:00" --end "2024-06-01 06:00"
-Full recovery — detect, backfill, and refresh Tableau
+# 2. Check for data gaps in an outage window
+python outage_backfill_orchestrator.py check \
+  --start "2024-06-01 02:00" --end "2024-06-01 06:00"
 
-python outage_backfill_orchestrator.py full --start "2024-06-01 02:00" --end "2024-06-01 06:00"
-Dry-run mode
-Parallel backfills
-Auto retry logic
-JSON report output
-Email alerting
-Graceful degradation
+# 3. Backfill only — no Tableau refresh
+python outage_backfill_orchestrator.py backfill \
+  --start "2024-06-01 02:00" --end "2024-06-01 06:00"
 
+# 4. Full recovery: discover → check → backfill → Tableau refresh
+python outage_backfill_orchestrator.py full \
+  --start "2024-06-01 02:00" --end "2024-06-01 06:00"
 
-*********************************************************************************************************************
+# Preview without executing anything
+python outage_backfill_orchestrator.py full \
+  --start "2024-06-01 02:00" --end "2024-06-01 06:00" --dry-run
+```
 
-Title: ETL Pipeline Outage Detection & Automated Backfill Orchestrator
-Background:
-The data platform runs scheduled Airflow DAGs that invoke Python ETL scripts. Each script reads from Oracle MES tables via SQL files stored in a bin/ directory, transforms the data, and loads it into MySQL — which then feeds Tableau dashboards used for business reporting.
-Problem:
-When Oracle, MySQL, or the Tableau server experiences an outage, data simply fails to load for that window. There is no automatic detection, no alerting on the gap, and no self-healing. Engineers must manually trace which DAGs were affected, identify the missing time range, re-run scripts in the right order, and then manually refresh Tableau — all of which is slow, inconsistent, and relies on someone noticing the gap in the first place.
-Solution:
-A single orchestrator script that:
+### Trigger modes
 
-Automatically maps every DAG → Python script → SQL file → Oracle table → MySQL table → Tableau dashboard
-Accepts an outage window (--start / --end) and queries both Oracle and MySQL to confirm which tables have missing data
-Re-triggers only the affected pipelines — in parallel, with retries — passing the exact window as backfill parameters
-Triggers a Tableau data source refresh after recovery so dashboards self-heal end to end
-Produces a timestamped JSON report and optional email alert for every run
+```bash
+# Run scripts directly (default)
+--mode subprocess
 
-Impact: Reduces mean time to recovery from hours of manual investigation to a single command, eliminates silent data gaps in dashboards, and provides a full audit trail of every backfill operation.
+# Use Airflow CLI
+--mode airflow_cli
 
-*********************************************************************************************************************
+# Use Airflow REST API
+--mode airflow_api
+```
+
+---
+
+## ⚙️ Installation
+
+```bash
+# Install dependencies
+pip install -r requirements_backfill.txt
+
+# Copy and fill in your credentials
+cp backfill_config.json my_config.json
+# Edit: oracle.dsn, oracle.user, mysql.host, tableau.token_value, etc.
+
+# Run
+python outage_backfill_orchestrator.py full \
+  --config my_config.json \
+  --start "2024-06-01 02:00" \
+  --end   "2024-06-01 06:00"
+```
+
+---
+
+## ✅ Features
+
+- 🔍 **Auto-discovery** — zero config needed for pipeline mapping; reads your existing files
+- 📊 **Dual-source gap detection** — checks Oracle and MySQL independently
+- ⚡ **Parallel backfills** — configurable worker count for fast recovery
+- 🔁 **Auto retry** — configurable attempts and delay per DAG
+- 👁️ **Dry-run mode** — preview exactly what will run without touching anything
+- 📝 **JSON reports** — timestamped audit trail in `reports/` for every run
+- 📧 **Email alerts** — optional SMTP notification on completion
+- 🛡️ **Graceful degradation** — works without optional drivers (`cx_Oracle`, `tableauserverclient`) installed
+
+---
+
+## 📋 Requirements
+
+| Package | Purpose | Required |
+|---------|---------|----------|
+| `cx_Oracle` | Oracle MES connectivity | For Oracle checks |
+| `mysql-connector-python` | MySQL connectivity | For MySQL checks |
+| `tableauserverclient` | Tableau REST API | For dashboard refresh |
+
+> The script runs in discovery + dry-run mode even without database drivers installed.
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE) for details.
