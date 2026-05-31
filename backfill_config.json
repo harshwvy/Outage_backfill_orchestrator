@@ -1,0 +1,55 @@
+{
+  "_comment": "Copy this file, fill in your credentials, and pass with --config",
+
+  "base_dir":    "dag_and_scripts",
+  "dags_dir":    "dag_and_scripts/dags",
+  "scripts_dir": "dag_and_scripts/scripts",
+  "bin_dir":     "dag_and_scripts/scripts/bin",
+  "log_dir":     "logs",
+  "report_dir":  "reports",
+
+  "oracle": {
+    "dsn":           "oracle-host:1521/ORCL",
+    "user":          "mes_user",
+    "password":      "mes_password",
+    "audit_tables":  [],
+    "timestamp_col": "CREATED_DATE"
+  },
+
+  "mysql": {
+    "host":          "mysql-host",
+    "port":          3306,
+    "database":      "etl_db",
+    "user":          "etl_user",
+    "password":      "etl_password",
+    "audit_tables":  [],
+    "timestamp_col": "created_at"
+  },
+
+  "tableau": {
+    "server_url":  "https://your-tableau-server",
+    "site_id":     "",
+    "token_name":  "my_pat_name",
+    "token_value": "my_pat_value"
+  },
+
+  "backfill": {
+    "max_workers":      4,
+    "retry_attempts":   3,
+    "retry_delay_secs": 30,
+    "dry_run":          false,
+    "trigger_via":      "subprocess",
+    "airflow_api_url":  "http://localhost:8080",
+    "airflow_api_user": "airflow",
+    "airflow_api_pass": "airflow"
+  },
+
+  "alerts": {
+    "enabled":        false,
+    "smtp_host":      "smtp.example.com",
+    "smtp_port":      587,
+    "from_addr":      "etl-alerts@example.com",
+    "to_addrs":       ["oncall@example.com"],
+    "subject_prefix": "[ETL-BACKFILL]"
+  }
+}

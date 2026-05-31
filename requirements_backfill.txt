@@ -1,0 +1,14 @@
+# Core (always required)
+# No extra packages needed for the base script
+
+# Oracle source connectivity
+cx_Oracle>=8.3.0
+
+# MySQL target connectivity
+mysql-connector-python>=8.0.0
+
+# Tableau Server connectivity
+tableauserverclient>=0.25.0
+
+# Optional: Airflow (if triggering via Airflow API)
+# apache-airflow>=2.6.0
